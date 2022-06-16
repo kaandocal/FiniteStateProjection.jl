@@ -12,7 +12,7 @@ RuntimeGeneratedFunctions = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
-Catalyst = "9, 10"
+Catalyst = "9, 10, 12"
 DiffEqBase = "6"
 MacroTools = "0.5.5, 0.5.6"
 Reexport = "1"
