@@ -23,7 +23,7 @@ For matrix conversions they should additionally implement:
 ### Built-in implementations
 
 ```@docs
-getsubstitutions(::DefaultIndexHandler, ::ReactionSystem)
+getsubstitutions(::OrderedIndexHandler, ::ReactionSystem)
 ```
 
 ## Function Building

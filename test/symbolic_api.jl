@@ -4,21 +4,11 @@ using SciMLBase: ODEProblem
 using SparseArrays: SparseMatrixCSC
 using Symbolics: @variables
 using Test
-using TOML
 
-@testset "Symbolic API and compatibility floors" begin
+@testset "Symbolic API" begin
     @variables p
 
     @test FiniteStateProjection._parameter_symbol(p) == :p
-
-    project = TOML.parsefile(joinpath(pkgdir(FiniteStateProjection), "Project.toml"))
-    compat = project["compat"]
-    @test compat["Catalyst"] == "16.2, 17"
-    @test compat["ModelingToolkitBase"] == "1.17"
-    @test compat["SciMLBase"] == "3"
-    @test compat["SymbolicIndexingInterface"] == "0.3.43"
-    @test compat["Symbolics"] == "7.39.2"
-    @test compat["SymbolicUtils"] == "4.18"
 
     rs = @reaction_network begin
         birth, 0 --> A

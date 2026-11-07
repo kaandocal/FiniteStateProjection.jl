@@ -28,7 +28,7 @@ ps = last.(pmap)
 
 Nmax = 200
 
-sys = FSPSystem(rs)
+sys = FSPSystem(rs, [:G, :P])
 
 function create_A(ps, Nmax)
     σ_off, σ_on, ρ_on, ρ_off, d = ps

@@ -20,7 +20,7 @@ rs = @reaction_network begin
     s2, B --> 0
 end
 
-sys = FSPSystem(rs)
+sys = FSPSystem(rs, [:A, :B])
 
 pmap = [
     :r1 => 2.0,

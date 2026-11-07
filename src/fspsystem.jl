@@ -12,8 +12,9 @@ layout, and generated rate functions used to construct ODE and steady-state prob
 
 # Arguments
 - `rs`: Catalyst reaction system without subsystems.
-- `ih`: Index handler for the FSP state array. By default,
-  `DefaultIndexHandler` uses Catalyst's species order.
+- `ih`: Index handler for the FSP state array, which determines how species are laid out in state space.
+        [`OrderedIndexHandler`](@ref) assigns each species a separate axis in a user-defined order. 
+        The default order is that returned by `Catalyst.species`.
 
 # Keyword Arguments
 - `combinatoric_ratelaw`: Whether to use combinatoric jump rate laws.
@@ -44,7 +45,7 @@ end
 
 function FSPSystem(
         rs::ReactionSystem,
-        ih::AbstractIndexHandler = DefaultIndexHandler{length(species(rs))}();
+        ih::AbstractIndexHandler = OrderedIndexHandler(rs);
         combinatoric_ratelaw::Bool = true
     )
     isempty(get_systems(rs)) ||
@@ -56,8 +57,8 @@ function FSPSystem(
     return FSPSystem(rs, ih, rfs)
 end
 
-function FSPSystem(rs::ReactionSystem, order::AbstractVector{Symbol}; kwargs...)
-    return FSPSystem(rs, PermutingIndexHandler(rs, order); kwargs...)
+function FSPSystem(rs::ReactionSystem, order::AbstractVector; offset = 1, kwargs...)
+    return FSPSystem(rs, OrderedIndexHandler(rs, order; offset); kwargs...)
 end
 
 """

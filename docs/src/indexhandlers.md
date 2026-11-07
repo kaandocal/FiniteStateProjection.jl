@@ -1,6 +1,6 @@
 # Index Handlers
 
-The task of an index handler is to provide a mapping between the system state and the way it is stored in memory, usually as a multidimensional array. The standard approach is to represent the states of a system with ``s`` reactions as an ``s``-dimensional array and have the index ``(i_1, \ldots, i_s)`` correspond to the state ``(n_1 = i_1, \ldots, n_s = i_s)``. This is implemented by the class [`DefaultIndexHandler`](@ref), which accepts an offset argument to deal with Julia's 1-based indexing (so the Julia index $(1,\ldots,1)$ corresponds to the state with no molecules).
+The task of an index handler is to provide a mapping between the system state and the way it is stored in memory, usually as a multidimensional array. The standard approach is to represent the states of a system with ``s`` reactions as an ``s``-dimensional array and have the index ``(i_1, \ldots, i_s)`` correspond to the state ``(n_1 = i_1, \ldots, n_s = i_s)``. This is implemented by the class [`OrderedIndexHandler`](@ref), which accept any ordering of the system species, as well as an optional offset argument defaulting to 1-based indexing for all species.
 
 ## Extending Index Handlers
 
@@ -20,11 +20,20 @@ differently from the default vector form.
 
 ```@docs
 AbstractIndexHandler
-DefaultIndexHandler
-NaiveIndexHandler
+OrderedIndexHandler
 singleindices
 pairedindices
 getsubstitutions
 build_rhs_header
 Base.LinearIndices
+```
+
+## Deprecated index handlers
+
+The following names are deprecated in favour of `OrderedIndexHandler`.
+
+```@docs
+DefaultIndexHandler
+NaiveIndexHandler
+PermutingIndexHandler
 ```

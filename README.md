@@ -56,7 +56,7 @@ rn = @reaction_network begin
     d, M --> 0
 end
 
-sys = FSPSystem(rn)
+sys = FSPSystem(rn, [:G_on, :M])
 
 # Parameters for our system
 ps = [:σ_on => 0.25, :σ_off => 0.15, :ρ => 15.0, :d => 1.0]

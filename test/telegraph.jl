@@ -21,7 +21,7 @@ rs = @reaction_network begin
     δ_p, P --> 0
 end
 
-sys = FSPSystem(rs)
+sys = FSPSystem(rs, [:G, :M, :P])
 
 prs = [exp(2 * randn()), exp(2 * randn())]
 pmap = [
