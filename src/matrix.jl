@@ -1,6 +1,6 @@
 function create_sparsematrix(sys::FSPSystem, dims::NTuple, ps, t)
-    Ntot = prod(dims)
     lind = LinearIndices(sys.ih, dims)
+    Ntot = length(lind)
 
     I = Int[]
     J = Int[]
@@ -38,12 +38,12 @@ function create_sparsematrix(sys::FSPSystem, dims::NTuple, ps, t)
         end
     end
 
-    return sparse(I, J, V)
+    return sparse(I, J, V, Ntot, Ntot)
 end
 
 function create_sparsematrix_ss(sys::FSPSystem, dims::NTuple, ps)
-    Ntot = prod(dims)
     lind = LinearIndices(sys.ih, dims)
+    Ntot = length(lind)
 
     I = Int[]
     J = Int[]
@@ -72,7 +72,7 @@ function create_sparsematrix_ss(sys::FSPSystem, dims::NTuple, ps)
         end
     end
 
-    return sparse(I, J, V)
+    return sparse(I, J, V, Ntot, Ntot)
 end
 
 """

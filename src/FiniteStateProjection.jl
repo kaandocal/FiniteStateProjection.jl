@@ -40,8 +40,8 @@ using CommonSolve: solve
 
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
-export AbstractIndexHandler, DefaultIndexHandler, FSPSystem, NaiveIndexHandler, SteadyState,
-    build_rhs_header, getsubstitutions, pairedindices, singleindices
+export AbstractIndexHandler, FSPSystem, OrderedIndexHandler, SteadyState,
+    DefaultIndexHandler, NaiveIndexHandler
 
 # Reexported model-definition and problem interface; approved via `reexports_allow`
 # in test/qa/qa.jl and documented in docs/src/mainapi.md.
@@ -98,6 +98,7 @@ abstract type AbstractIndexHandler end
 
 include("fspsystem.jl")
 include("indexhandlers.jl")
+include("deprecated.jl")
 include("build_rhs.jl")
 include("build_rhs_ss.jl")
 include("matrix.jl")

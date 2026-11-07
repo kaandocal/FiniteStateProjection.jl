@@ -26,7 +26,7 @@ Returns pairs `(I .- shift, I)` for state transitions that remain within `arr`.
 # Arguments
 - `idxhandler`: The index handler that defines the state-space layout.
 - `arr`: Either the state array or its tuple of dimensions.
-- `shift`: The reaction stoichiometry as a Cartesian index in Catalyst species order.
+- `shift`: The stoichiometry vector for the transition.
 
 # Returns
 - An iterator of source and destination Cartesian-index pairs.
@@ -108,61 +108,121 @@ function LinearIndices end
 ##
 
 """
-    DefaultIndexHandler{N}()
-    DefaultIndexHandler{N}(offset, perm)
+    OrderedIndexHandler(rs::ReactionSystem; offset = 1)
+    OrderedIndexHandler(rs::ReactionSystem, order; offset = 1)
 
-Default index handler for an FSP system with `N` species.
+Index handler for an FSP system with `N` species. Each species gets its own axis of the
+state array, in the order `order` (defaults to the order returned by `Catalyst.species`). 
+Dimension `i` of the state array tracks the species `order[i]`.
 
-# Fields
-- `offset`: Julia index corresponding to a molecular count of zero.
-- `perm`: Mapping from state-array dimensions to Catalyst species order.
+# Arguments
+- `rs`: Catalyst reaction system.
+- `order`: The species of `rs`, given as species names (`Symbol`s) or Catalyst species.
+  Every species must appear exactly once. By default, `order` follows `Catalyst.species`.
 
-It represents the state as an `N`-dimensional array, maps a molecule count of zero to
-`offset`, and uses `perm` to map state-array dimensions to Catalyst's species order.
+# Keyword Arguments
+- `offset`: Offset for each species (index corresponding to molecule counts of 0). 
+  Can be a single number, which is used for all species. Defaults to `1` in agreement with Julia's one-based indexing. 
 
-The zero-argument constructor uses Julia's one-based indexing and preserves the
-species order. This representation is appropriate when every state in the truncated
-array is reachable; reduce conserved species before construction when possible.
+This representation is appropriate when every state in the truncated array is reachable;
+reduce conserved species before construction when possible.
 
 # Examples
 ```julia
-julia > DefaultIndexHandler{2}()
-DefaultIndexHandler{2}(1, (1, 2))
+rn = @reaction_network begin
+    birth, 0 --> A
+    death, A --> B
+end
+ih = OrderedIndexHandler(rn, [:B, :A]; offset = 1)  # dimension 1 tracks B, dimension 2 tracks A
 ```
 """
-struct DefaultIndexHandler{N} <: AbstractIndexHandler
-    offset::Int
+struct OrderedIndexHandler{N} <: AbstractIndexHandler
+    offset::NTuple{N, Int}
     perm::NTuple{N, Int}
 end
 
-DefaultIndexHandler{N}() where {N} = DefaultIndexHandler{N}(1, Tuple(1:N))
+# Expands an offset given as one integer, or as one integer per dimension.
+_offsets(offset::Integer, N::Integer) = ntuple(_ -> Int(offset), N)
 
-"""
-    NaiveIndexHandler
-
-Deprecated constructor forwarding to [`DefaultIndexHandler`](@ref).
-
-# Arguments
-- `args...`: Positional arguments accepted by `DefaultIndexHandler`.
-
-# Keyword Arguments
-- `kwargs...`: Keyword arguments accepted by `DefaultIndexHandler`.
-
-Use `DefaultIndexHandler` directly instead.
-"""
-function NaiveIndexHandler(args...; kwargs...)
-    Base.depwarn(
-        "`NaiveIndexHandler` is deprecated, use `DefaultIndexHandler` instead.",
-        :NaiveIndexHandler
+function _offsets(offset, N::Integer)
+    length(offset) == N || throw(
+        DimensionMismatch(
+            "Length of offset ($(length(offset))) does not match number of species ($N)"
+        )
     )
-    return DefaultIndexHandler(args...; kwargs...)
+    return ntuple(i -> Int(offset[i]), N)
 end
 
-Base.vec(::DefaultIndexHandler, arr) = vec(arr)
-Base.LinearIndices(::DefaultIndexHandler, arr) = LinearIndices(arr)
+function OrderedIndexHandler(rs::ReactionSystem; offset = 1)
+    N = numspecies(rs)
+    return OrderedIndexHandler{N}(_offsets(offset, N), Tuple(1:N))
+end
+
+# Position of `sp` among the species of the reaction system `spec`.
+function _species_position(spec, sp::Symbol)
+    index = findfirst(s -> getname(s) == sp, spec)
+    isnothing(index) && throw(ArgumentError("Cannot find species $sp in reaction system"))
+    return index
+end
+
+function _species_position(spec, sp)
+    index = findfirst(s -> isequal(s, sp), spec)
+    isnothing(index) && throw(ArgumentError("Cannot find species $sp in reaction system"))
+    return index
+end
+
+function OrderedIndexHandler(rs::ReactionSystem, order::AbstractVector; offset = 1)
+    spec = species(rs)
+    nspec = length(spec)
+
+    length(order) == nspec || throw(
+        DimensionMismatch(
+            "Length of species vector ($(length(order))) does not match number of species ($nspec)"
+        )
+    )
+
+    perm = zeros(Int, nspec)
+    seen = falses(nspec)
+    for (i, sp) in enumerate(order)
+        index = _species_position(spec, sp)
+        seen[index] && throw(ArgumentError("Species $sp specified twice in ordering"))
+        seen[index] = true
+        perm[i] = index
+    end
+
+    return OrderedIndexHandler{nspec}(_offsets(offset, nspec), Tuple(perm))
+end
+
+Base.vec(::OrderedIndexHandler, arr) = vec(arr)
+
+# Maps state values to positions in `vec(arr)`. The state values run over the axes of the
+# array, which may start anywhere, while the positions run from 1 in column-major order.
+struct ShiftedLinearIndices{N, L <: LinearIndices{N}}
+    positions::L
+    firsts::NTuple{N, Int}
+end
+
+Base.length(lind::ShiftedLinearIndices) = length(lind.positions)
+
+function Base.getindex(lind::ShiftedLinearIndices, idx::CartesianIndex)
+    return lind.positions[CartesianIndex(map((i, f) -> i - f + 1, Tuple(idx), lind.firsts))]
+end
+
+_axis_length(ax::Integer) = ax
+_axis_length(ax) = length(ax)
+_axis_first(ax::Integer) = 1
+_axis_first(ax) = Int(first(ax))
+
+function Base.LinearIndices(::OrderedIndexHandler, dims::Tuple)
+    shape = map(_axis_length, dims)
+    firsts = map(_axis_first, dims)
+    return ShiftedLinearIndices(LinearIndices(shape), firsts)
+end
+
+Base.LinearIndices(ih::OrderedIndexHandler, arr::AbstractArray) = LinearIndices(ih, axes(arr))
 
 function pairedindices(
-        ih::DefaultIndexHandler{N}, arr::AbstractArray{T, N},
+        ih::OrderedIndexHandler{N}, arr::AbstractArray{T, N},
         shift::CartesianIndex{N}
     ) where {T, N}
     return pairedindices(ih, axes(arr), shift)
@@ -173,7 +233,7 @@ end
 # trips Aqua's unbound-type-parameter check. The zero-dimensional case is handled by the
 # explicit method below.
 function pairedindices(
-        ih::DefaultIndexHandler{N}, dims::Tuple{T, Vararg{T}},
+        ih::OrderedIndexHandler{N}, dims::Tuple{T, Vararg{T}},
         shift::CartesianIndex{N}
     ) where {N, T <: Number}
     length(dims) == N || throw(
@@ -187,14 +247,14 @@ end
 # Handles the degenerate zero-dimensional case (no species), where neither `T`-constrained
 # method below matches because `Tuple{}` has no element type.
 function pairedindices(
-        ::DefaultIndexHandler{0}, ::Tuple{}, ::CartesianIndex{0}
+        ::OrderedIndexHandler{0}, ::Tuple{}, ::CartesianIndex{0}
     )
     return zip(CartesianIndices(()), CartesianIndices(()))
 end
 
 # Important: the species in `shift` are ordered according to `Catalyst.species`!
 function pairedindices(
-        ih::DefaultIndexHandler{N}, dims::Tuple{T, Vararg{T}},
+        ih::OrderedIndexHandler{N}, dims::Tuple{T, Vararg{T}},
         shift::CartesianIndex{N}
     ) where {N, T <: AbstractVector}
     length(dims) == N || throw(
@@ -218,7 +278,7 @@ function pairedindices(
 end
 
 function pairedindices(
-        ::DefaultIndexHandler, dims::Tuple,
+        ::OrderedIndexHandler, dims::Tuple,
         shift::CartesianIndex
     )
     throw(
@@ -229,11 +289,12 @@ function pairedindices(
 end
 
 """
-    getsubstitutions(sys::FSPSystem{DefaultIndexHandler}; state_sym::Symbol)::Dict
+    getsubstitutions(ih::OrderedIndexHandler, rs::ReactionSystem; state_sym::Symbol)::Dict
 
-Defines the abundance of species ``S_i`` to be `state_sym[i] - offset`.
+Defines the abundance of species ``S_i`` to be `state_sym[i] - offset[i]`, where dimension
+`i` of the state array tracks the species `perm[i]` of `rs`.
 """
-function getsubstitutions(ih::DefaultIndexHandler, rs::ReactionSystem; state_sym::Symbol)
+function getsubstitutions(ih::OrderedIndexHandler, rs::ReactionSystem; state_sym::Symbol)
     nspecs = numspecies(rs)
     state_array = (@variables ($state_sym)[1:nspecs])[1]
     state_sym_vec = [state_array[i] for i in 1:nspecs]
@@ -241,53 +302,5 @@ function getsubstitutions(ih::DefaultIndexHandler, rs::ReactionSystem; state_sym
     species_orig = species(rs)
     species_perm = [species_orig[ih.perm[i]] for i in 1:nspecs]
 
-    return Dict(symbol => state_sym_vec[i] - ih.offset for (i, symbol) in enumerate(species_perm))
-end
-
-#"""
-#    PermutingIndexHandler(rs::ReactionSystem, order::AbstractVector)
-#
-#Constructs an index handler for the reaction system in which the species appear in the order
-#defined by the vector `order`.
-#"""
-function PermutingIndexHandler(rs::ReactionSystem, order::AbstractVector{Symbol})
-    system_species = species(rs)
-    resolved_order = map(order) do sym
-        index = findfirst(species -> getname(species) == sym, system_species)
-        isnothing(index) && error("Cannot find species $sym in reaction system")
-        system_species[index]
-    end
-    return PermutingIndexHandler(rs, resolved_order)
-end
-
-function PermutingIndexHandler(rs::ReactionSystem, order::AbstractVector)
-    spec = species(rs)
-    nspec = length(spec)
-
-    if nspec != length(order)
-        throw(
-            DimensionMismatch(
-                "Length of species vector ($(length(order))) does not match number of species ($nspec)"
-            )
-        )
-    end
-
-    perm = zeros(Int, nspec)
-    count = zeros(Int, nspec)
-
-    for i in 1:nspec
-        idx = findfirst(s -> isequal(s, order[i]), spec)
-        isnothing(idx) &&
-            throw(ArgumentError("Cannot find species $(order[i]) in reaction system"))
-
-        count[idx] > 0 &&
-            throw(ArgumentError("Species $(order[i]) specified twice in ordering"))
-
-        count[idx] += 1
-        perm[i] = idx
-    end
-
-    @assert count == ones(Int, nspec)
-
-    return DefaultIndexHandler(1, Tuple(perm))
+    return Dict(symbol => state_sym_vec[i] - ih.offset[i] for (i, symbol) in enumerate(species_perm))
 end

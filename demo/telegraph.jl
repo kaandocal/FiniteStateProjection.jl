@@ -13,7 +13,7 @@ end
 
 ##
 
-sys = FSPSystem(rs)
+sys = FSPSystem(rs, [:G_on, :M])
 
 # Parameters for our system
 ps = [:r1 => 0.25, :r2 => 0.15, :r3 => 15.0, :r4 => 1.0]

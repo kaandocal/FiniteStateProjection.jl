@@ -23,8 +23,8 @@ u0[1] = 1.0
 
 SUITE["construct"] = BenchmarkGroup()
 
-SUITE["construct"]["FSPSystem"] = @benchmarkable FSPSystem($rs)
-sys = FSPSystem(rs)
+SUITE["construct"]["FSPSystem"] = @benchmarkable FSPSystem($rs, [:A, :B])
+sys = FSPSystem(rs, [:A, :B])
 SUITE["construct"]["sparse_A"] = @benchmarkable SparseMatrixCSC(
     $sys, ($Nmax + 1, $Nmax + 1), $pmap, 0
 )
