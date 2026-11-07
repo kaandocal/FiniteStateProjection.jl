@@ -1,0 +1,106 @@
+using Test
+using AxisArrays: AxisArray, Axis
+using Catalyst: @reaction_network
+using FiniteStateProjection
+using SciMLBase: ODEProblem, SteadyStateProblem
+using OrdinaryDiffEq: Tsit5
+
+@testset "Labelled state arrays" begin
+    rs = @reaction_network begin
+        s1, 0 --> A
+        d1, A --> 0
+        s2, 0 --> B
+        d2, B --> 0
+    end
+    pmap = [:s1 => 1.0, :d1 => 1.0, :s2 => 2.0, :d2 => 0.5]
+
+    u = rand(5, 4)
+    u ./= sum(u)
+
+    # Systems and states are built from the same templates, so their axes agree.
+    template_ab = AxisArray(u, Axis{:A}(0:4), Axis{:B}(0:3))
+    template_ba = AxisArray(permutedims(u), Axis{:B}(0:3), Axis{:A}(0:4))
+    sys = FSPSystem(rs, template_ab)
+    sys_ba = FSPSystem(rs, template_ba)
+
+    @testset "the species order sets the state-array dimensions" begin
+        @test sys.ih.perm == (1, 2)
+        @test sys_ba.ih.perm == (2, 1)
+    end
+
+    @testset "plain arrays are unchanged" begin
+        prob = ODEProblem(sys, u, (0.0, 1.0), pmap)
+        @test prob.u0 == u
+    end
+
+    @testset "labelled initial states keep their labels" begin
+        prob = ODEProblem(sys, template_ab, (0.0, 1.0), pmap)
+        @test prob.u0 isa AxisArray
+        @test parent(prob.u0) ≈ u
+        @test SteadyStateProblem(sys, template_ab, pmap).u0 isa AxisArray
+    end
+
+    @testset "labelled solutions are labelled" begin
+        sol = solve(ODEProblem(sys, template_ab, (0.0, 1.0), pmap), Tsit5(); saveat = [0.0, 1.0])
+        @test all(s -> s isa AxisArray, sol.u)
+    end
+
+    @testset "a species order from the template is used for the state" begin
+        prob = ODEProblem(sys_ba, template_ba, (0.0, 1.0), pmap)
+        @test parent(prob.u0) ≈ permutedims(u)
+    end
+
+    @testset "system built from a template" begin
+        template = AxisArray(zeros(4, 5), Axis{:B}(0:3), Axis{:A}(0:4))
+        sys_t = FSPSystem(rs, template)
+        @test sys_t.ih.perm == (2, 1)
+        @test sys_t.ih == OrderedIndexHandler(rs, [:B, :A])
+        @test sys_t.ih.offset == (1, 1)
+    end
+
+    @testset "offsets default to 1 whatever the axis values" begin
+        template = AxisArray(zeros(5, 4), Axis{:A}(2:6), Axis{:B}(0:3))
+        sys_t = FSPSystem(rs, template)
+        @test sys_t.ih.perm == (1, 2)
+        @test sys_t.ih.offset == (1, 1)
+        @test sys_t.ih == OrderedIndexHandler(rs, [:A, :B])
+    end
+
+    @testset "a one-dimensional template" begin
+        rs1 = @reaction_network begin
+            s, 0 --> A
+            d, A --> 0
+        end
+        sys1 = FSPSystem(rs1, AxisArray(zeros(4), Axis{:A}(0:3)))
+        @test sys1.ih.perm == (1,)
+        @test sys1.ih.offset == (1,)
+    end
+
+    @testset "offsets can be overridden by species" begin
+        template = AxisArray(zeros(5, 4), Axis{:A}(0:4), Axis{:B}(0:3))
+        @test FSPSystem(rs, template; offset = [:A => 2]).ih.offset == (2, 1)
+        # A species that is not listed keeps the default.
+        @test FSPSystem(rs, template; offset = [:B => 0]).ih.offset == (1, 0)
+        @test FSPSystem(rs, template; offset = [:A => 2, :B => 3]).ih.offset == (2, 3)
+    end
+
+    @testset "offset overrides must name axes and be integers" begin
+        template = AxisArray(zeros(5, 4), Axis{:A}(0:4), Axis{:B}(0:3))
+        @test_throws ArgumentError FSPSystem(rs, template; offset = [:C => 2])
+        @test_throws ArgumentError FSPSystem(rs, template; offset = [:A => 1.5])
+    end
+
+    @testset "axis values are labels and do not set offsets" begin
+        rs1 = @reaction_network begin
+            s, 0 --> A
+            d, A --> 0
+        end
+        labels = AxisArray(zeros(4), Axis{:A}(["a", "b", "c", "d"]))
+        @test FSPSystem(rs1, labels).ih.offset == (1,)
+    end
+
+    @testset "template species must belong to the network" begin
+        template = AxisArray(zeros(5, 4), Axis{:A}(0:4), Axis{:C}(0:3))
+        @test_throws ArgumentError FSPSystem(rs, template)
+    end
+end

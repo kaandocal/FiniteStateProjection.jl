@@ -40,8 +40,8 @@ using CommonSolve: solve
 
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
-export AbstractIndexHandler, FSPSystem, OrderedIndexHandler, SteadyState,
-    DefaultIndexHandler, NaiveIndexHandler
+export AbstractIndexHandler, DefaultIndexHandler, FSPSystem, NaiveIndexHandler, OrderedIndexHandler,
+    SteadyState, build_rhs_header, getsubstitutions, pairedindices, singleindices
 
 # Reexported model-definition and problem interface; approved via `reexports_allow`
 # in test/qa/qa.jl and documented in docs/src/mainapi.md.
