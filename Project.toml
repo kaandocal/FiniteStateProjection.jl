@@ -22,6 +22,7 @@ Distributions = "0.25"
 LinearAlgebra = "1"
 ModelingToolkitBase = "1.17"
 PrecompileTools = "1.2.1"
+OffsetArrays = "1"
 OrdinaryDiffEq = "7"
 Random = "1"
 RuntimeGeneratedFunctions = "0.5"
@@ -49,6 +50,7 @@ SteadyStateDiffEq = "9672c7b4-1e72-59bd-8a11-6ac3964bc41f"
 Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
 
 [targets]
-test = ["Distributions", "LinearAlgebra", "OrdinaryDiffEq", "Random", "SafeTestsets", "SciMLTesting", "SteadyStateDiffEq", "Sundials", "TOML", "Test"]
+test = ["Distributions", "LinearAlgebra", "OffsetArrays", "OrdinaryDiffEq", "Random", "SafeTestsets", "SciMLTesting", "SteadyStateDiffEq", "Sundials", "TOML", "Test"]
