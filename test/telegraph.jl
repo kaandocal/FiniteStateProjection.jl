@@ -132,3 +132,56 @@ A_fsp_ss_perm = SparseMatrixCSC(sys_perm, size(u0_perm), pmap, SteadyState())
 #sol_ss_perm.u ./= sum(sol_ss_perm.u)
 #
 #@test sol_ss_perm.u ≈ pdims(sol_ss.u) atol=1e-4
+
+## Steady state of the two-species telegraph model (gene and mRNA only)
+
+@testset "Telegraph steady state against closed forms" begin
+    rs_ss = @reaction_network begin
+        σ_on * (1 - G), 0 --> G
+        σ_off, G --> 0
+        ρ, G --> G + M
+        d, M --> 0
+    end
+    sys_ss = FSPSystem(rs_ss, [:G, :M])
+
+    σ_on, σ_off, ρ, d = 0.25, 0.15, 15.0, 1.0
+    pmap_ss = [:σ_on => σ_on, :σ_off => σ_off, :ρ => ρ, :d => d]
+
+    Mmax_ss = 60
+    dims_ss = (2, Mmax_ss + 1)
+    A_ss_tg = Matrix(SparseMatrixCSC(sys_ss, dims_ss, pmap_ss, SteadyState()))
+
+    # Columns of the steady-state matrix sum to zero, so replace one equation by normalisation.
+    A_ss_tg[1, :] .= 1.0
+    b_ss = zeros(prod(dims_ss))
+    b_ss[1] = 1.0
+    p_ss = reshape(A_ss_tg \ b_ss, dims_ss)
+
+    # Closed form for the stationary mRNA distribution. Given θ, M is Poisson with mean
+    # λθ, and θ follows Beta(σ_on, σ_off). Integrating out θ gives the series below. Every
+    # term is positive, so it is numerically safe.
+    function telegraph_steady_pmf(a, b, λ, nmax; kmax = 400)
+        pmf = zeros(nmax + 1)
+        pre = exp(-λ)                       # e^{-λ} λⁿ/n! (a)ₙ/(a+b)ₙ, built up in n
+        for n in 0:nmax
+            s = 0.0
+            term = 1.0
+            for k in 0:kmax                 # Σₖ (b)ₖ/(n+a+b)ₖ λᵏ/k!
+                s += term
+                term *= (b + k) / (n + a + b + k) * λ / (k + 1)
+            end
+            pmf[n + 1] = pre * s
+            pre *= λ / (n + 1) * (a + n) / (a + b + n)
+        end
+        return pmf
+    end
+
+    pM = vec(sum(p_ss; dims = 1))
+    pM_exact = telegraph_steady_pmf(σ_on, σ_off, ρ / d, Mmax_ss)
+
+    @test sum(p_ss) ≈ 1 atol = 1.0e-10
+    @test sum(p_ss[2, :]) ≈ σ_on / (σ_on + σ_off) atol = 1.0e-8
+    @test pM ≈ pM_exact atol = 1.0e-8
+    # The truncation at M = 60 holds almost all of the probability.
+    @test pM[end] < 1.0e-10
+end
