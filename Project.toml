@@ -15,7 +15,14 @@ SymbolicIndexingInterface = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 
+[weakdeps]
+AxisArrays = "39de3d68-74b9-583c-8d2d-e117c070f3a9"
+
+[extensions]
+AxisArraysExt = "AxisArrays"
+
 [compat]
+AxisArrays = "0.4"
 Catalyst = "16.2, 17"
 CommonSolve = "0.2.4"
 Distributions = "0.25"
@@ -40,6 +47,7 @@ Test = "1"
 julia = "1.10"
 
 [extras]
+AxisArrays = "39de3d68-74b9-583c-8d2d-e117c070f3a9"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
@@ -53,4 +61,4 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
 
 [targets]
-test = ["Distributions", "LinearAlgebra", "OffsetArrays", "OrdinaryDiffEq", "Random", "SafeTestsets", "SciMLTesting", "SteadyStateDiffEq", "Sundials", "TOML", "Test"]
+test = ["AxisArrays", "Distributions", "LinearAlgebra", "OffsetArrays", "OrdinaryDiffEq", "Random", "SafeTestsets", "SciMLTesting", "SteadyStateDiffEq", "Sundials", "TOML", "Test"]

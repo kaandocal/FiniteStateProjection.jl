@@ -1,4 +1,5 @@
 using Test
+using AxisArrays: AxisArray, Axis
 using OrdinaryDiffEq
 using SteadyStateDiffEq
 using Distributions
@@ -115,3 +116,13 @@ sol_ss_perm = solve(prob_ss_perm, SSRootfind())
 sol_ss_perm.u ./= sum(sol_ss_perm.u)
 
 @test sol_ss_perm.u ≈ sol_ss.u' atol = 1.0e-4
+
+## AxisArray template tests
+
+template = AxisArray(zeros(Nmax + 1, Nmax + 1), Axis{:A}(0:Nmax), Axis{:B}(0:Nmax))
+sys_tpl = FSPSystem(rs, template)
+
+@test sys_tpl.ih == OrderedIndexHandler(rs, [:A, :B])
+# The matrix is indexed by array positions, so it takes the size of the template.
+@test SparseMatrixCSC(sys_tpl, size(template), pmap, 0) ≈ A
+@test SparseMatrixCSC(sys_tpl, size(template), pmap, SteadyState()) ≈ A_ss
