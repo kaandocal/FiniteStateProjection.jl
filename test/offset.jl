@@ -91,13 +91,17 @@ end
     pmap = [:birth => 3.0, :death => 4.0]
     N = 20
 
-    # Matrix conversion takes plain dimensions, so it is checked with the default offset.
-    sys = FSPSystem(rs)
-    u = zeros(N + 1)
-    u[1] = 1.0
-    A = SparseMatrixCSC(sys, size(u), pmap, 0.0)
-    prob = ODEProblem(sys, u, (0.0, 1.0), pmap)
-    du = similar(u)
-    prob.f(du, u, prob.p, 0.0)
-    @test du ≈ A * u
+    u_offset = OffsetArray(zeros(N + 1), 0:N)
+    u_offset[0] = 1.0
+    sys = FSPSystem(rs, OrderedIndexHandler(rs; offset = 0))
+
+    A = SparseMatrixCSC(sys, axes(u_offset), pmap, 0.0)
+    prob = ODEProblem(sys, u_offset, (0.0, 1.0), pmap)
+    du = similar(u_offset)
+    prob.f(du, u_offset, prob.p, 0.0)
+    @test collect(du) ≈ A * collect(u_offset)
+
+    # The steady-state matrix conserves probability on the same axes.
+    A_ss = SparseMatrixCSC(sys, axes(u_offset), pmap, SteadyState())
+    @test all(abs.(sum(A_ss; dims = 1)) .< 1.0e-12)
 end

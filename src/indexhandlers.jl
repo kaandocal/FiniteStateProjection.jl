@@ -194,7 +194,32 @@ function OrderedIndexHandler(rs::ReactionSystem, order::AbstractVector; offset =
 end
 
 Base.vec(::OrderedIndexHandler, arr) = vec(arr)
-Base.LinearIndices(::OrderedIndexHandler, arr) = LinearIndices(arr)
+
+# Maps state values to positions in `vec(arr)`. The state values run over the axes of the
+# array, which may start anywhere, while the positions run from 1 in column-major order.
+struct ShiftedLinearIndices{N, L <: LinearIndices{N}}
+    positions::L
+    firsts::NTuple{N, Int}
+end
+
+Base.length(lind::ShiftedLinearIndices) = length(lind.positions)
+
+function Base.getindex(lind::ShiftedLinearIndices, idx::CartesianIndex)
+    return lind.positions[CartesianIndex(map((i, f) -> i - f + 1, Tuple(idx), lind.firsts))]
+end
+
+_axis_length(ax::Integer) = ax
+_axis_length(ax) = length(ax)
+_axis_first(ax::Integer) = 1
+_axis_first(ax) = Int(first(ax))
+
+function Base.LinearIndices(::OrderedIndexHandler, dims::Tuple)
+    shape = map(_axis_length, dims)
+    firsts = map(_axis_first, dims)
+    return ShiftedLinearIndices(LinearIndices(shape), firsts)
+end
+
+Base.LinearIndices(ih::OrderedIndexHandler, arr::AbstractArray) = LinearIndices(ih, axes(arr))
 
 function pairedindices(
         ih::OrderedIndexHandler{N}, arr::AbstractArray{T, N},
