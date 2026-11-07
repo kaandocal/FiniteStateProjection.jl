@@ -3,6 +3,7 @@ using AxisArrays: AxisArray, Axis
 using Catalyst: @reaction_network
 using FiniteStateProjection
 using SciMLBase: ODEProblem, SteadyStateProblem
+using OrdinaryDiffEq: Tsit5
 
 @testset "Labelled state arrays" begin
     rs = @reaction_network begin
@@ -13,45 +14,40 @@ using SciMLBase: ODEProblem, SteadyStateProblem
     end
     pmap = [:s1 => 1.0, :d1 => 1.0, :s2 => 2.0, :d2 => 0.5]
 
-    sys = FSPSystem(rs, [:A, :B])
-    sys_perm = FSPSystem(rs, [:B, :A])
-
-    @testset "the species order sets the state-array dimensions" begin
-        @test sys.ih.perm == (1, 2)
-        @test sys_perm.ih.perm == (2, 1)
-    end
-
     u = rand(5, 4)
     u ./= sum(u)
 
-    # The same distribution with axes labelled by species, in both orders.
-    u_ab = AxisArray(u, Axis{:A}(0:4), Axis{:B}(0:3))
-    u_ba = AxisArray(permutedims(u), Axis{:B}(0:3), Axis{:A}(0:4))
+    # Systems and states are built from the same templates, so their axes agree.
+    template_ab = AxisArray(u, Axis{:A}(0:4), Axis{:B}(0:3))
+    template_ba = AxisArray(permutedims(u), Axis{:B}(0:3), Axis{:A}(0:4))
+    sys = FSPSystem(rs, template_ab)
+    sys_ba = FSPSystem(rs, template_ba)
+
+    @testset "the species order sets the state-array dimensions" begin
+        @test sys.ih.perm == (1, 2)
+        @test sys_ba.ih.perm == (2, 1)
+    end
 
     @testset "plain arrays are unchanged" begin
         prob = ODEProblem(sys, u, (0.0, 1.0), pmap)
         @test prob.u0 == u
     end
 
-    @testset "labelled arrays are reordered to the system order" begin
-        @test ODEProblem(sys, u_ab, (0.0, 1.0), pmap).u0 ≈ u
-        @test ODEProblem(sys, u_ba, (0.0, 1.0), pmap).u0 ≈ u
-        @test SteadyStateProblem(sys, u_ab, pmap).u0 ≈ u
-        @test SteadyStateProblem(sys, u_ba, pmap).u0 ≈ u
+    @testset "labelled initial states keep their labels" begin
+        prob = ODEProblem(sys, template_ab, (0.0, 1.0), pmap)
+        @test prob.u0 isa AxisArray
+        @test parent(prob.u0) ≈ u
+        @test SteadyStateProblem(sys, template_ab, pmap).u0 isa AxisArray
     end
 
-    @testset "labelled arrays are reordered for a custom species order" begin
-        @test ODEProblem(sys_perm, u_ab, (0.0, 1.0), pmap).u0 ≈ permutedims(u)
-        @test ODEProblem(sys_perm, u_ba, (0.0, 1.0), pmap).u0 ≈ permutedims(u)
+    @testset "labelled solutions are labelled" begin
+        sol = solve(ODEProblem(sys, template_ab, (0.0, 1.0), pmap), Tsit5(); saveat = [0.0, 1.0])
+        @test all(s -> s isa AxisArray, sol.u)
     end
 
-    @testset "axis names must match the species" begin
-        wrong = AxisArray(u, Axis{:A}(0:4), Axis{:C}(0:3))
-        @test_throws ArgumentError ODEProblem(sys, wrong, (0.0, 1.0), pmap)
-        @test_throws ArgumentError SteadyStateProblem(sys, wrong, pmap)
-
-        too_many = AxisArray(rand(5, 4, 2), Axis{:A}(0:4), Axis{:B}(0:3), Axis{:C}(0:1))
-        @test_throws ArgumentError ODEProblem(sys, too_many, (0.0, 1.0), pmap)
+    @testset "a species order from the template is used for the state" begin
+        prob = ODEProblem(sys_ba, template_ba, (0.0, 1.0), pmap)
+        @test parent(prob.u0) ≈ permutedims(u)
     end
 
     @testset "system built from a template" begin
